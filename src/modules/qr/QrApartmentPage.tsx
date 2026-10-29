@@ -20,6 +20,7 @@ import { toast, errorMessage } from '@/lib/toast'
 import { WhatsappNotify } from '@/components/WhatsappNotify'
 import { VIDEO_MAX } from '@/lib/files'
 import { useNotifyContacts, commentMessage } from '@/lib/whatsappNotify'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { getOutboxSummary, getOutboxEntries, subscribe, flushOutbox, retryMediaEntry, discardMediaEntry, retryFailedEntry, deleteFailedEntry, type OutboxEntry } from '@/lib/outbox'
 import {
   CircleCheck as CheckCircle2, Wrench, Search, Send, Camera, Video, X, FileText,
@@ -168,6 +169,8 @@ export function QrApartmentPage() {
       .catch(() => {})
   })
 
+  const { itemName, categoryName, matches } = useCatalogName()
+
   const itemCategoryMap = useMemo(() => {
     const map = new Map<number, string>()
     for (const it of items) map.set(it.id, it.category)
@@ -188,14 +191,14 @@ export function QrApartmentPage() {
     const q = search.toLowerCase().trim()
     return norms.filter((nr) => {
       if (nr.qty <= 0) return false
-      if (q && !nr.item_name.toLowerCase().includes(q)) return false
+      if (q && !matches(search, nr.item_name, 'item')) return false
       if (activeCategory) {
         const cat = itemCategoryMap.get(nr.item_id)
         if (cat !== activeCategory) return false
       }
       return true
     })
-  }, [norms, search, activeCategory, itemCategoryMap])
+  }, [norms, search, activeCategory, itemCategoryMap, matches])
 
   const groupedNorms = useMemo(() => {
     const map = new Map<NormType, SvNorm[]>()
@@ -367,7 +370,7 @@ export function QrApartmentPage() {
             <div className="flex gap-1.5 overflow-x-auto pb-1">
               <Chip active={activeCategory === ''} onClick={() => setActiveCategory('')} label={t.qr.allNorms} />
               {categories.map((cat) => (
-                <Chip key={cat} active={activeCategory === cat} onClick={() => setActiveCategory(cat)} label={cat} />
+                <Chip key={cat} active={activeCategory === cat} onClick={() => setActiveCategory(cat)} label={categoryName(cat)} />
               ))}
             </div>
             {norms.length === 0 && <p className="text-sm text-muted text-center mt-8">{t.apartments.noNorms}</p>}
@@ -381,9 +384,9 @@ export function QrApartmentPage() {
                     {list.map((nr) => (
                       <div key={`${nr.item_id}-${nr.norm_type}`} className="px-4 py-3 flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <span className="text-sm text-ink break-words">{nr.item_name}</span>
+                          <span className="text-sm text-ink break-words">{itemName(nr.item_name)}</span>
                           {itemCategoryMap.get(nr.item_id) && (
-                            <span className="text-xs text-muted block sm:inline sm:ml-2">{itemCategoryMap.get(nr.item_id)}</span>
+                            <span className="text-xs text-muted block sm:inline sm:ml-2">{categoryName(itemCategoryMap.get(nr.item_id)!)}</span>
                           )}
                         </div>
                         <span className="text-sm text-muted shrink-0 ml-2">

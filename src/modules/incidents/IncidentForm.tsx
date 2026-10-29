@@ -5,6 +5,7 @@ import { fetchItems, createIncident, uploadIncidentPhoto, cleanupPhotos } from '
 import type { SvApartment, SvItem, SvNorm, IncidentKind } from '@/lib/database.types'
 import { useAuth } from '@/modules/core/store'
 import { useI18n } from '@/i18n'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { friendlyMessage } from '@/lib/errors'
 import { ErrorState } from '@/components/ErrorState'
 import { resolveMime, isHeicFile } from '@/lib/files'
@@ -37,6 +38,7 @@ function validateMediaFile(file: File): string | null {
 
 export function IncidentForm({ backTo }: { backTo?: string }) {
   const { t } = useI18n()
+  const { itemName, categoryName } = useCatalogName()
   const kinds: { value: IncidentKind; label: string }[] = [
     { value: 'breakdown', label: t.incidents.kindBreakdown },
     { value: 'broken', label: t.incidents.kindBroken },
@@ -187,7 +189,7 @@ export function IncidentForm({ backTo }: { backTo?: string }) {
           building: apt?.building,
           author: profile?.full_name ?? null,
           kindLabel: kinds.find((k) => k.value === kind)?.label ?? kind,
-          what: selectedItem?.name ?? freeText.trim(),
+          what: selectedItem ? itemName(selectedItem.name) : freeText.trim(),
           qty: Number(qty) || 1,
           comment: comment.trim() || null,
         }))
@@ -286,14 +288,14 @@ export function IncidentForm({ backTo }: { backTo?: string }) {
               <select value={itemId ?? ''} onChange={(e) => { const v = e.target.value; setItemId(v ? Number(v) : null); if (v) setFreeText('') }}
                 className="w-full bg-app rounded-xl px-4 py-3 text-sm border border-line focus:border-accent focus:outline-none mb-2">
                 <option value="">— {t.incidents.freeText} —</option>
-                {itemOptions.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                {itemOptions.map((i) => <option key={i.id} value={i.id}>{itemName(i.name)}</option>)}
               </select>
               {!itemId && (
                 <input value={freeText} onChange={(e) => setFreeText(e.target.value)} placeholder={t.incidents.freeText}
                   className="w-full bg-app rounded-xl px-4 py-3 text-sm border border-line focus:border-accent focus:outline-none" />
               )}
               {selectedItem && (
-                <p className="text-xs text-muted mt-1">{selectedItem.category}</p>
+                <p className="text-xs text-muted mt-1">{categoryName(selectedItem.category)}</p>
               )}
             </Field>
           )}

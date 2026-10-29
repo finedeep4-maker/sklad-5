@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useI18n } from '@/i18n'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { toast, errorMessage } from '@/lib/toast'
 import { Plus, X, Loader as Loader2 } from 'lucide-react'
 import { ErrorState } from '@/components/ErrorState'
@@ -43,6 +44,7 @@ function parseQty(s: string): number | null {
 
 export function RoomsPanel({ apartmentId, aptType, canEdit, totals }: Props) {
   const { t, n } = useI18n()
+  const { itemName } = useCatalogName()
   const roomLabel = (name: string) => (t.rooms.names as Record<string, string>)[name] ?? name
 
   const [rooms, setRooms] = useState<Room[]>([])
@@ -186,7 +188,7 @@ export function RoomsPanel({ apartmentId, aptType, canEdit, totals }: Props) {
                         onClick={() => openEdit(r)}
                         className="w-full flex items-center justify-between gap-2 text-left disabled:cursor-default"
                       >
-                        <span className="text-sm text-ink">{r.item_name}</span>
+                        <span className="text-sm text-ink">{itemName(r.item_name)}</span>
                         <span className="flex items-center gap-2 shrink-0">
                           <span className="text-sm text-muted">
                             {n(String(r.actual))} / {n(String(r.norm))} {unitLabel(r.base_unit as BaseUnit)}
@@ -267,6 +269,7 @@ function RoomEditor({ state, roomName, catalog, categories, takenItemIds, canFor
   onClose: () => void
 }) {
   const { t } = useI18n()
+  const { itemName, categoryName, matches } = useCatalogName()
   const isEdit = state.itemId !== null
   const [itemId, setItemId] = useState<number | null>(state.itemId)
   const [search, setSearch] = useState('')
@@ -287,8 +290,8 @@ function RoomEditor({ state, roomName, catalog, categories, takenItemIds, canFor
 
   const items = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return catalog.filter((i) => i.kind === 'asset' && i.active && !takenItemIds.has(i.id) && (!q || i.name.toLowerCase().includes(q)))
-  }, [catalog, search, takenItemIds])
+    return catalog.filter((i) => i.kind === 'asset' && i.active && !takenItemIds.has(i.id) && (!q || matches(search, i.name, 'item')))
+  }, [catalog, search, takenItemIds, matches])
   const selected = catalog.find((i) => i.id === itemId)
   const unit = creating ? t.common.units.pcs : selected ? unitLabel(selected.base_unit as BaseUnit) : state.unit
 
@@ -307,7 +310,7 @@ function RoomEditor({ state, roomName, catalog, categories, takenItemIds, canFor
           <div>
             <label className="block text-sm text-muted mb-1">{t.rooms.item}</label>
             {isEdit ? (
-              <p className="text-sm text-ink">{state.itemName}</p>
+              <p className="text-sm text-ink">{itemName(state.itemName)}</p>
             ) : (
               creating ? (
                 <>
@@ -317,7 +320,7 @@ function RoomEditor({ state, roomName, catalog, categories, takenItemIds, canFor
                     onChange={(e) => setNewCategoryId(Number(e.target.value))}
                     className={`${inputCls} mt-2`}
                   >
-                    {assetCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {assetCategories.map((c) => <option key={c.id} value={c.id}>{categoryName(c.name)}</option>)}
                   </select>
                   {assetCategories.length === 0 && <p className="text-xs text-warn mt-1">{t.rooms.noAssetCategories}</p>}
                   <button type="button" onClick={() => setCreating(false)} className="mt-2 text-xs text-accent">{t.rooms.pickExisting}</button>
@@ -331,7 +334,7 @@ function RoomEditor({ state, roomName, catalog, categories, takenItemIds, canFor
                     className={`${inputCls} mt-2`}
                   >
                     <option value="">—</option>
-                    {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                    {items.map((i) => <option key={i.id} value={i.id}>{itemName(i.name)}</option>)}
                   </select>
                   <button type="button" onClick={() => setCreating(true)} className="mt-2 text-xs text-accent">{t.rooms.createNew}</button>
                 </>
