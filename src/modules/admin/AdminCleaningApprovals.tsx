@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, X, Loader as Loader2, Camera, Video } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { formatDateTime } from '@/lib/format'
 import { toast } from '@/lib/toast'
 import { friendlyMessage } from '@/lib/errors'
@@ -26,6 +27,7 @@ function isVideoPath(path: string): boolean {
 
 export function AdminCleaningApprovals() {
   const { t, n } = useI18n()
+  const { itemName } = useCatalogName()
   const [items, setItems] = useState<PendingCleaning[]>([])
   const [apartments, setApartments] = useState<Apartment[]>([])
   const [staff, setStaff] = useState<Map<number, string>>(new Map())
@@ -76,7 +78,7 @@ export function AdminCleaningApprovals() {
       const res = await approveCleaning(action.item.id, action.decision, note.trim() || null)
       toast(action.decision === 'confirm' ? t.admin.approvals.confirmed : t.admin.approvals.rejected, 'success')
       if (res.shortages && res.shortages.length > 0) {
-        toast(`${t.admin.approvals.shortages}: ${res.shortages.map((s) => s.item).join(', ')}`, 'info')
+        toast(`${t.admin.approvals.shortages}: ${res.shortages.map((s) => itemName(s.item)).join(', ')}`, 'info')
       }
       setAction(null)
       setNote('')
@@ -134,7 +136,7 @@ export function AdminCleaningApprovals() {
                     <p className="text-xs text-muted">{t.admin.approvals.noMaterials}</p>
                   ) : (
                     lines.map((l) => (
-                      <p key={`${l.norm_type}-${l.item_id}`} className="text-sm text-ink">{l.item}: {n(String(l.qty))}</p>
+                      <p key={`${l.norm_type}-${l.item_id}`} className="text-sm text-ink">{itemName(l.item)}: {n(String(l.qty))}</p>
                     ))
                   )}
                 </div>
