@@ -80,6 +80,8 @@ export interface Staff {
 export interface Category {
   id: number
   name: string
+  name_en: string | null
+  name_ar: string | null
   kind: ItemKind
   sort: number
   tenant_coef: number | null
@@ -96,6 +98,8 @@ export interface Item {
   id: number
   category_id: number
   name: string
+  name_en: string | null
+  name_ar: string | null
   base_unit: BaseUnit
   pack_size: number
   pack_label: string

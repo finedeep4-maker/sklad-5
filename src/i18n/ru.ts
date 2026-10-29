@@ -831,6 +831,11 @@ export const ru = {
       tenantCoefInvalid: 'Число больше 0, до 3 знаков после запятой, не более 99999.999',
       tenantCoefFromCategory: 'с группы',
       tenantCoefExampleFmt: 'Закупка 100 → жильцу {amount}',
+      nameEn: 'Название (English)',
+      nameAr: 'الاسم (العربية)',
+      nameTranslationHint: 'Если перевод не заполнен, показывается русское название',
+      searchPlaceholder: 'Поиск по названию (рус, en, ar)',
+      noSearchResults: 'Ничего не найдено',
     },
     orders: {
       title: 'Заказы поставщикам',

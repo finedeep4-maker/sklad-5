@@ -19,6 +19,7 @@ import {
 import { upsertNormRule, deleteNormRule } from './api'
 import { formatQty } from '@/lib/format'
 import { friendlyMessage } from '@/lib/errors'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 const normTypeOrder: NormType[] = ['asset_standing', 'turnover_replenish', 'cleaning_consumption']
 
@@ -47,6 +48,7 @@ export function NormsTab({
   onReload,
 }: Props) {
   const { t, n } = useI18n()
+  const cat = useCatalogName()
   const normTypeLabels: Record<NormType, string> = {
     asset_standing: t.apartments.normInventory,
     turnover_replenish: t.apartments.normTurnover,
@@ -229,7 +231,8 @@ export function NormsTab({
   const getItemName = (itemId: number): string => {
     const item = catalog.find((i) => i.id === itemId)
     if (!item) return `#${n(String(itemId))}`
-    return item.active ? item.name : `${item.name} (${t.admin.apartments.itemInactive})`
+    const base = cat.itemName(item.name)
+    return item.active ? base : `${base} (${t.admin.apartments.itemInactive})`
   }
 
   const getItemInfo = (itemId: number) => catalog.find((i) => i.id === itemId)

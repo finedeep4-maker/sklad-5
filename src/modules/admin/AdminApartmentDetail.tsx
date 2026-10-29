@@ -25,6 +25,7 @@ import { RoomsPanel } from '@/modules/rooms/RoomsPanel'
 import { useLiveRefresh } from '@/lib/realtime'
 import { OwnerBadge } from '@/components/OwnerBadge'
 import { EditApartmentModal } from './AdminApartmentList'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 type Tab = 'norms' | 'rooms' | 'cleaning' | 'incidents'
 
@@ -44,6 +45,7 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 
 export function AdminApartmentDetail() {
   const { t, n } = useI18n()
+  const cat = useCatalogName()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const aptId = Number(id)
@@ -212,7 +214,7 @@ export function AdminApartmentDetail() {
                 <div className="bg-surface border border-line rounded-lg divide-y divide-[var(--line)]">
                   {gapItems.map((g) => (
                     <div key={`${g.item_id}`} className="px-3 py-2.5 flex items-center justify-between">
-                      <span className="text-sm text-ink">{g.name}</span>
+                      <span className="text-sm text-ink">{cat.itemName(g.name)}</span>
                       <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-bad-soft text-bad">−{n(String(g.gap))}</span>
                     </div>
                   ))}
@@ -299,7 +301,7 @@ export function AdminApartmentDetail() {
                 <div className="bg-ok-soft rounded-lg border border-line divide-y divide-[var(--line)]">
                   {issueResult.issued.map((it) => (
                     <div key={it.item_id} className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-sm text-ink">{it.name}</span>
+                      <span className="text-sm text-ink">{cat.itemName(it.name)}</span>
                       <span className="text-sm text-ok">{n(String(it.qty))}</span>
                     </div>
                   ))}
@@ -312,7 +314,7 @@ export function AdminApartmentDetail() {
                 <div className="bg-bad-soft rounded-lg border border-line divide-y divide-[var(--line)]">
                   {issueResult.short.map((it) => (
                     <div key={it.item_id} className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-sm text-ink">{it.name}</span>
+                      <span className="text-sm text-ink">{cat.itemName(it.name)}</span>
                       <span className="text-sm text-bad">{n(String(it.issued))}/{n(String(it.need))}</span>
                     </div>
                   ))}

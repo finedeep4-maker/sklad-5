@@ -16,12 +16,15 @@ import {
 import type { Category, Item, ItemKind, BaseUnit, Supplier } from '@/lib/database.types'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
-import { Plus, Trash2, CreditCard as Edit3, X, Check, ChevronRight, ChevronDown, Package, Folder } from 'lucide-react'
+import { Plus, Trash2, CreditCard as Edit3, X, Check, ChevronRight, ChevronDown, Package, Folder, Search } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErrorState } from '@/components/ErrorState'
 import { friendlyMessage, friendlyMessage as errorMessage } from '@/lib/errors'
 import { useLiveRefresh } from '@/lib/realtime'
 import { unitLabel } from '@/lib/format'
+import { useCatalogName } from '@/modules/core/useCatalogName'
+import { useCatalogNames } from '@/modules/core/catalogNamesStore'
+import { filterCatalog } from '@/modules/admin/catalogFilter'
 
 const baseUnitOptions: BaseUnit[] = ['pcs', 'g', 'ml']
 
@@ -41,10 +44,12 @@ function formatCoef(v: number): string {
 
 export function CatalogPage() {
   const { t, n } = useI18n()
+  const { categoryName, itemName, matches } = useCatalogName()
   const kindLabels: Record<ItemKind, string> = {
     asset: t.admin.catalog.kindAsset,
     consumable: t.admin.catalog.kindConsumable,
   }
+  const [search, setSearch] = useState('')
   const [categories, setCategories] = useState<Category[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
@@ -76,17 +81,12 @@ export function CatalogPage() {
   }
 
   useEffect(() => { load() }, [])
-  useLiveRefresh(['categories', 'items'], () => load(true))
+  useLiveRefresh(['categories', 'items'], () => { load(true); void useCatalogNames.getState().load() })
 
-  const itemsByCategory = useMemo(() => {
-    const map = new Map<number, Item[]>()
-    for (const it of items) {
-      const list = map.get(it.category_id) ?? []
-      list.push(it)
-      map.set(it.category_id, list)
-    }
-    return map
-  }, [items])
+  const groups = useMemo(
+    () => filterCatalog(categories, items, search, matches),
+    [categories, items, search, matches],
+  )
 
   if (loading) {
     return <div className="px-4 pt-8 text-center text-muted">{t.app.loading}</div>
@@ -106,13 +106,26 @@ export function CatalogPage() {
         </button>
       </div>
 
+      {categories.length > 0 && (
+        <div className="relative mb-3">
+          <Search className="w-4 h-4 text-muted absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.admin.catalog.searchPlaceholder}
+            className="w-full bg-surface border border-line rounded-lg ps-9 pe-3 py-2.5 text-sm text-ink focus:outline-none"
+          />
+        </div>
+      )}
+
       {categories.length === 0 ? (
         <p className="text-sm text-muted text-center mt-8">{t.admin.catalog.noCategories}</p>
+      ) : groups.length === 0 ? (
+        <p className="text-sm text-muted text-center mt-8">{t.admin.catalog.noSearchResults}</p>
       ) : (
         <div className="space-y-2">
-          {categories.map((cat) => {
-            const catItems = itemsByCategory.get(cat.id) ?? []
-            const expanded = expandedCat === cat.id
+          {groups.map(({ category: cat, items: catItems, matched }) => {
+            const expanded = expandedCat === cat.id || matched
             return (
               <div key={cat.id} className="bg-surface border border-line rounded-xl overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -126,7 +139,7 @@ export function CatalogPage() {
                       <ChevronRight className="w-4 h-4 text-muted shrink-0" />
                     )}
                     <Folder className="w-4 h-4 text-muted shrink-0" />
-                    <span className="text-sm font-medium text-ink truncate">{cat.name}</span>
+                    <span className="text-sm font-medium text-ink truncate">{categoryName(cat.name)}</span>
                     <span className="text-xs text-muted shrink-0">{kindLabels[cat.kind]}</span>
                     <span className="text-xs text-muted shrink-0">· {n(String(catItems.length))}</span>
                   </button>
@@ -155,7 +168,7 @@ export function CatalogPage() {
                         <div key={it.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-line last:border-0">
                           <Package className="w-4 h-4 text-muted shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <span className={`text-sm ${it.active ? 'text-ink' : 'text-muted line-through'}`}>{it.name}</span>
+                            <span className={`text-sm ${it.active ? 'text-ink' : 'text-muted line-through'}`}>{itemName(it.name)}</span>
                             <span className="text-xs text-muted ml-2">
                               {it.pack_size > 1 ? `${n(String(it.pack_size))} ${it.pack_label}` : t.common.units[it.base_unit]}
                               {it.min_stock != null && ` · ${t.common.minimum} ${n(String(it.min_stock))}`}
@@ -250,12 +263,12 @@ export function CatalogPage() {
         <CategoryEditor
           category={editingCat}
           onClose={() => { setEditingCat(null); setAddingCat(false) }}
-          onSave={async (name, kind, sort, tenantCoef) => {
+          onSave={async ({ name, name_en, name_ar, kind, sort, tenantCoef }) => {
             try {
               if (editingCat) {
-                await updateCategory(editingCat.id, { name, kind, sort, tenant_coef: tenantCoef })
+                await updateCategory(editingCat.id, { name, name_en, name_ar, kind, sort, tenant_coef: tenantCoef })
               } else {
-                await createCategory(name, kind, sort, tenantCoef)
+                await createCategory({ name, name_en, name_ar, kind, sort, tenant_coef: tenantCoef })
               }
               toast(t.admin.catalog.save, 'success')
               setEditingCat(null)
@@ -327,7 +340,7 @@ function CategoryEditor({
 }: {
   category: Category | null
   onClose: () => void
-  onSave: (name: string, kind: ItemKind, sort: number, tenantCoef: number | null) => void
+  onSave: (values: { name: string; name_en: string | null; name_ar: string | null; kind: ItemKind; sort: number; tenantCoef: number | null }) => void
 }) {
   const { t, n } = useI18n()
   const kindLabels: Record<ItemKind, string> = {
@@ -335,6 +348,8 @@ function CategoryEditor({
     consumable: t.admin.catalog.kindConsumable,
   }
   const [name, setName] = useState(category?.name ?? '')
+  const [nameEn, setNameEn] = useState(category?.name_en ?? '')
+  const [nameAr, setNameAr] = useState(category?.name_ar ?? '')
   const [kind, setKind] = useState<ItemKind>(category?.kind ?? 'asset')
   const [sort, setSort] = useState(String(category?.sort ?? 0))
   const [tenantCoef, setTenantCoef] = useState(category?.tenant_coef != null ? String(category.tenant_coef) : '')
@@ -345,6 +360,15 @@ function CategoryEditor({
         <Field label={t.admin.catalog.categoryName}>
           <input value={name} onChange={(e) => setName(e.target.value)}
             className="w-full bg-app rounded-lg px-4 py-2.5 text-sm focus:outline-none" />
+        </Field>
+        <Field label={t.admin.catalog.nameEn}>
+          <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} dir="ltr"
+            className="w-full bg-app rounded-lg px-4 py-2.5 text-sm focus:outline-none" />
+        </Field>
+        <Field label={t.admin.catalog.nameAr}>
+          <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} dir="rtl"
+            className="w-full bg-app rounded-lg px-4 py-2.5 text-sm focus:outline-none" />
+          <p className="text-xs text-muted mt-0.5">{t.admin.catalog.nameTranslationHint}</p>
         </Field>
         <Field label={t.admin.catalog.kind}>
           <div className="grid grid-cols-2 gap-2">
@@ -374,7 +398,7 @@ function CategoryEditor({
           )}
         </Field>
       </div>
-      <Actions onClose={onClose} onSave={() => onSave(name.trim(), kind, Number(sort) || 0, parseCoef(tenantCoef))} disabled={!name.trim() || (tenantCoef.trim() != null && tenantCoef.trim() !== '' && parseCoef(tenantCoef) == null)} />
+      <Actions onClose={onClose} onSave={() => onSave({ name: name.trim(), name_en: nameEn.trim() || null, name_ar: nameAr.trim() || null, kind, sort: Number(sort) || 0, tenantCoef: parseCoef(tenantCoef) })} disabled={!name.trim() || (tenantCoef.trim() != null && tenantCoef.trim() !== '' && parseCoef(tenantCoef) == null)} />
     </Modal>
   )
 }
@@ -393,6 +417,8 @@ function ItemEditor({
   onSave: (params: {
     category_id: number
     name: string
+    name_en: string | null
+    name_ar: string | null
     base_unit: BaseUnit
     pack_size: number
     pack_label: string
@@ -409,8 +435,11 @@ function ItemEditor({
   }) => void
 }) {
   const { t, n } = useI18n()
+  const { categoryName } = useCatalogName()
   const [categoryId, setCategoryId] = useState(item?.category_id ?? defaultCategoryId)
   const [name, setName] = useState(item?.name ?? '')
+  const [nameEn, setNameEn] = useState(item?.name_en ?? '')
+  const [nameAr, setNameAr] = useState(item?.name_ar ?? '')
   const [baseUnit, setBaseUnit] = useState<BaseUnit>(item?.base_unit ?? 'pcs')
   const [packSize, setPackSize] = useState(String(item?.pack_size ?? 1))
   const [packLabel, setPackLabel] = useState(item?.pack_label ?? t.common.units.pcs)
@@ -449,12 +478,21 @@ function ItemEditor({
         <Field label={t.admin.catalog.category}>
           <select value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}
             className="w-full bg-app rounded-lg px-4 py-2.5 text-sm focus:outline-none">
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.id}>{categoryName(c.name)}</option>)}
           </select>
         </Field>
         <Field label={t.admin.catalog.itemName}>
           <input value={name} onChange={(e) => setName(e.target.value)}
             className="w-full bg-app rounded-lg px-4 py-2.5 text-sm focus:outline-none" />
+        </Field>
+        <Field label={t.admin.catalog.nameEn}>
+          <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} dir="ltr"
+            className="w-full bg-app rounded-lg px-4 py-2.5 text-sm focus:outline-none" />
+        </Field>
+        <Field label={t.admin.catalog.nameAr}>
+          <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} dir="rtl"
+            className="w-full bg-app rounded-lg px-4 py-2.5 text-sm focus:outline-none" />
+          <p className="text-xs text-muted mt-0.5">{t.admin.catalog.nameTranslationHint}</p>
         </Field>
         <Field label={t.admin.catalog.baseUnit}>
           <div className={`grid grid-cols-3 gap-2 ${unitLocked ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -555,6 +593,8 @@ function ItemEditor({
         onSave={() => onSave({
           category_id: categoryId,
           name: name.trim(),
+          name_en: nameEn.trim() || null,
+          name_ar: nameAr.trim() || null,
           base_unit: baseUnit,
           pack_size: Number(packSize),
           pack_label: packLabel.trim() || t.common.units.pcs,

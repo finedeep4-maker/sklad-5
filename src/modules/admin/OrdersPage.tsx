@@ -17,6 +17,7 @@ import {
   type PurchaseOrderStatus,
 } from '@/modules/admin/api'
 import { ShoppingCart, ChevronRight, X, Loader } from 'lucide-react'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 type Filter = 'all' | PurchaseOrderStatus
 
@@ -159,6 +160,7 @@ interface LineState extends PurchaseOrderLine {
 
 function OrderSheet({ order, onClose, onChanged }: { order: PurchaseOrderRow; onClose: () => void; onChanged: () => void }) {
   const { t, n } = useI18n()
+  const cat = useCatalogName()
   const [lines, setLines] = useState<LineState[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -262,7 +264,7 @@ function OrderSheet({ order, onClose, onChanged }: { order: PurchaseOrderRow; on
               const left = Math.max(l.qty - l.received_qty, 0)
               return (
                 <div key={l.item_id} className="border border-line rounded-xl p-3">
-                  <div className="text-sm font-medium text-ink">{l.name}</div>
+                  <div className="text-sm font-medium text-ink">{cat.itemName(l.name)}</div>
                   <div className="text-xs text-muted mb-2">
                     {t.admin.orders.ordered}: {n(formatQty(l.qty, l))}
                     {l.received_qty > 0 && ` · ${t.admin.orders.received}: ${n(formatQty(l.received_qty, l))}`}

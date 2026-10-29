@@ -833,6 +833,11 @@ export const en: Dict = {
       tenantCoefInvalid: 'A number greater than 0, up to 3 decimal places, no more than 99999.999',
       tenantCoefFromCategory: 'from category',
       tenantCoefExampleFmt: 'Purchase 100 → tenant {amount}',
+      nameEn: 'Name (English)',
+      nameAr: 'الاسم (العربية)',
+      nameTranslationHint: 'If translation is empty, the Russian name is shown',
+      searchPlaceholder: 'Search by name (ru, en, ar)',
+      noSearchResults: 'Nothing found',
     },
     orders: {
       title: 'Purchase orders',

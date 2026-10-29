@@ -3,6 +3,7 @@ import { toApiError } from '@/lib/errors'
 import { fetchAllPages, chunk } from '@/lib/paginate'
 import { resolveMime, extForMime, validateReceipt } from '@/lib/files'
 import { currentDict } from '@/i18n'
+import { useCatalogNames } from '@/modules/core/catalogNamesStore'
 import type {
   WarehouseStockRow,
   ReportStockMoveRow,
@@ -1145,7 +1146,7 @@ export async function setTenantCoef(scope: 'item' | 'category', id: number, coef
 export async function fetchCategories(): Promise<Category[]> {
   const { data, error, status } = await supabase
     .from('categories')
-    .select('id,name,kind,sort')
+    .select('id,name,name_en,name_ar,kind,sort')
     .order('sort')
     .order('name')
   if (error) throw toApiError(error, status)
@@ -1154,17 +1155,33 @@ export async function fetchCategories(): Promise<Category[]> {
   return (data ?? []).map((c) => ({ ...c, tenant_coef: catCoef.get(c.id) ?? null }))
 }
 
-export async function createCategory(name: string, kind: ItemKind, sort: number, tenantCoef: number | null = null): Promise<void> {
-  const { data, error, status } = await supabase.from('categories').insert({ name, kind, sort }).select('id').single()
+export async function createCategory(params: {
+  name: string
+  name_en?: string | null
+  name_ar?: string | null
+  kind: ItemKind
+  sort: number
+  tenant_coef?: number | null
+}): Promise<void> {
+  const { tenant_coef: tenantCoef, ...payload } = params
+  payload.name_en = payload.name_en?.trim() || null
+  payload.name_ar = payload.name_ar?.trim() || null
+  const { data, error, status } = await supabase.from('categories').insert({ name: payload.name, name_en: payload.name_en, name_ar: payload.name_ar, kind: payload.kind, sort: payload.sort }).select('id').single()
   if (error) throw toApiError(error, status)
   const newId = (data as { id: number }).id
   if (tenantCoef != null) {
     await setTenantCoef('category', newId, tenantCoef)
   }
+  void useCatalogNames.getState().load()
 }
 
-export async function updateCategory(id: number, patch: Partial<Pick<Category, 'name' | 'kind' | 'sort' | 'tenant_coef'>>): Promise<void> {
-  const { tenant_coef: tenantCoef, ...rest } = patch
+export async function updateCategory(id: number, patch: Partial<Pick<Category, 'name' | 'name_en' | 'name_ar' | 'kind' | 'sort' | 'tenant_coef'>>): Promise<void> {
+  const { tenant_coef: tenantCoef, name_en: nameEn, name_ar: nameAr, ...base } = patch
+  const rest = {
+    ...base,
+    ...(nameEn !== undefined ? { name_en: nameEn?.trim() || null } : {}),
+    ...(nameAr !== undefined ? { name_ar: nameAr?.trim() || null } : {}),
+  }
   if (Object.keys(rest).length > 0) {
     const { error, status } = await supabase.from('categories').update(rest).eq('id', id)
     if (error) throw toApiError(error, status)
@@ -1172,6 +1189,7 @@ export async function updateCategory(id: number, patch: Partial<Pick<Category, '
   if (tenantCoef !== undefined) {
     await setTenantCoef('category', id, tenantCoef)
   }
+  void useCatalogNames.getState().load()
 }
 
 export async function deleteCategory(id: number): Promise<void> {
@@ -1191,7 +1209,7 @@ export async function fetchItems(): Promise<Item[]> {
   const rows = await fetchAllPages<Item>((from, to) =>
     supabase
       .from('items')
-      .select('id,category_id,name,base_unit,pack_size,pack_label,min_stock,target_stock,note,default_cost,track_on_hand,qr_code,photo_path,active,sort,supplier_id')
+      .select('id,category_id,name,name_en,name_ar,base_unit,pack_size,pack_label,min_stock,target_stock,note,default_cost,track_on_hand,qr_code,photo_path,active,sort,supplier_id')
       .order('sort')
       .order('name')
       .order('id')
@@ -1205,6 +1223,8 @@ export async function fetchItems(): Promise<Item[]> {
 export async function createItem(params: {
   category_id: number
   name: string
+  name_en?: string | null
+  name_ar?: string | null
   base_unit: BaseUnit
   pack_size: number
   pack_label: string
@@ -1218,6 +1238,8 @@ export async function createItem(params: {
   tenant_coef?: number | null
 }): Promise<number> {
   const { tenant_coef: tenantCoef, ...payload } = params
+  payload.name_en = payload.name_en?.trim() || null
+  payload.name_ar = payload.name_ar?.trim() || null
   const { data, error, status } = await supabase
     .from('items')
     .insert({ sort: 0, ...payload, active: true })
@@ -1228,11 +1250,17 @@ export async function createItem(params: {
   if (tenantCoef != null) {
     await setTenantCoef('item', newId, tenantCoef)
   }
+  void useCatalogNames.getState().load()
   return newId
 }
 
-export async function updateItem(id: number, patch: Partial<Pick<Item, 'name' | 'category_id' | 'base_unit' | 'pack_size' | 'pack_label' | 'min_stock' | 'target_stock' | 'note' | 'default_cost' | 'sort' | 'track_on_hand' | 'active' | 'supplier_id' | 'tenant_coef'>>): Promise<void> {
-  const { tenant_coef: tenantCoef, ...rest } = patch
+export async function updateItem(id: number, patch: Partial<Pick<Item, 'name' | 'name_en' | 'name_ar' | 'category_id' | 'base_unit' | 'pack_size' | 'pack_label' | 'min_stock' | 'target_stock' | 'note' | 'default_cost' | 'sort' | 'track_on_hand' | 'active' | 'supplier_id' | 'tenant_coef'>>): Promise<void> {
+  const { tenant_coef: tenantCoef, name_en: nameEn, name_ar: nameAr, ...base } = patch
+  const rest = {
+    ...base,
+    ...(nameEn !== undefined ? { name_en: nameEn?.trim() || null } : {}),
+    ...(nameAr !== undefined ? { name_ar: nameAr?.trim() || null } : {}),
+  }
   if (Object.keys(rest).length > 0) {
     const { error, status } = await supabase.from('items').update(rest).eq('id', id)
     if (error) throw toApiError(error, status)
@@ -1240,6 +1268,7 @@ export async function updateItem(id: number, patch: Partial<Pick<Item, 'name' | 
   if (tenantCoef !== undefined) {
     await setTenantCoef('item', id, tenantCoef)
   }
+  void useCatalogNames.getState().load()
 }
 
 export async function archiveItem(id: number): Promise<void> {

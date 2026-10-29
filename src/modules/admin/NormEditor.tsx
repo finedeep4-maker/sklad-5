@@ -4,6 +4,7 @@ import { X, Check, Loader as Loader2 } from 'lucide-react'
 import type { NormType, BaseUnit } from '@/lib/database.types'
 import type { NormCatalogItem } from './norms'
 import { unitLabel } from '@/lib/format'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 interface Props {
   normType: NormType
@@ -31,6 +32,7 @@ export function NormEditor({
   onClose,
 }: Props) {
   const { t } = useI18n()
+  const cat = useCatalogName()
   const normTypeLabels: Record<NormType, string> = {
     asset_standing: t.apartments.normInventory,
     turnover_replenish: t.apartments.normTurnover,
@@ -58,10 +60,10 @@ export function NormEditor({
       if (!item.active && item.id !== selectedItemId) return false
       if (excludeItemIds.has(item.id) && item.id !== selectedItemId) return false
       if (!showAll && item.kind !== defaultKind) return false
-      if (q && !item.name.toLowerCase().includes(q)) return false
+      if (q && !cat.matches(q, item.name, 'item')) return false
       return true
     })
-  }, [catalog, search, showAll, defaultKind, excludeItemIds, selectedItemId])
+  }, [catalog, search, showAll, defaultKind, excludeItemIds, selectedItemId, cat])
 
   const selectedItem = catalog.find((i) => i.id === selectedItemId)
 
@@ -80,7 +82,7 @@ export function NormEditor({
             <label className="block text-sm text-muted mb-1">{t.admin.normTemplates.item}</label>
             {isEdit ? (
               <div className="w-full bg-app rounded-lg px-4 py-2.5 text-sm text-ink">
-                {selectedItem?.name ?? `#${selectedItemId}`}
+                {selectedItem ? cat.itemName(selectedItem.name) : `#${selectedItemId}`}
               </div>
             ) : (
               <>
@@ -97,7 +99,7 @@ export function NormEditor({
                   size={4}
                 >
                   {filteredItems.map((i) => (
-                    <option key={i.id} value={i.id}>{i.name} ({i.category})</option>
+                    <option key={i.id} value={i.id}>{cat.itemName(i.name)} ({cat.categoryName(i.category)})</option>
                   ))}
                 </select>
                 <label className="flex items-center gap-2 text-xs text-muted">

@@ -8,6 +8,7 @@ import { useLiveRefresh } from '@/lib/realtime'
 import { ArrowLeft, Plus, Trash2, CreditCard as Edit3, X, Check } from 'lucide-react'
 import { ErrorState } from '@/components/ErrorState'
 import { friendlyMessage } from '@/lib/errors'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 const aptTypes: AptType[] = ['studio', '1br', '2br']
 
@@ -19,6 +20,7 @@ function unitShort(unit: BaseUnit, units: Record<BaseUnit, string>): string {
 
 export function NormTemplatesPage() {
   const { t, n } = useI18n()
+  const cat = useCatalogName()
   const aptTypeLabels: Record<AptType, string> = {
     studio: t.admin.normTemplates.studio,
     '1br': t.admin.normTemplates.br1,
@@ -157,7 +159,7 @@ export function NormTemplatesPage() {
                     return (
                       <div key={nr.id} className="px-4 py-2.5 flex items-center justify-between">
                         <div className="min-w-0">
-                          <span className="text-sm text-ink">{item?.name ?? `#${n(String(nr.item_id))}`}</span>
+                          <span className="text-sm text-ink">{item ? cat.itemName(item.name) : `#${n(String(nr.item_id))}`}</span>
                           <span className="text-xs text-muted ml-1">{n(String(nr.qty))} {item ? unitShort(item.base_unit, t.common.units) : ''}</span>
                           {nr.note && <span className="text-xs text-muted block">{nr.note}</span>}
                         </div>
@@ -214,6 +216,7 @@ function NormEditorModal({
   onSave: (normType: string, itemId: number, qty: number, note: string | null) => void
 }) {
   const { t } = useI18n()
+  const cat = useCatalogName()
   const [itemId, setItemId] = useState(norm?.item_id ?? 0)
   const [qty, setQty] = useState(String(norm?.qty ?? 1))
   const qtyValid = useMemo(() => {
@@ -238,7 +241,7 @@ function NormEditorModal({
             <label className="block text-sm text-ink mb-1">{t.admin.normTemplates.item}</label>
             <select value={itemId} onChange={(e) => setItemId(Number(e.target.value))} className="w-full bg-app rounded-xl px-4 py-2.5 text-sm focus:outline-none">
               <option value="0">—</option>
-              {items.filter((i) => !takenIds.has(i.item_id) || i.item_id === itemId).map((i) => <option key={i.item_id} value={i.item_id}>{i.name}</option>)}
+              {items.filter((i) => !takenIds.has(i.item_id) || i.item_id === itemId).map((i) => <option key={i.item_id} value={i.item_id}>{cat.itemName(i.name)}</option>)}
             </select>
             {normType !== 'asset_standing' && (
               <p className="text-xs text-muted mt-1">{t.admin.apartments.normExclusiveHint}</p>

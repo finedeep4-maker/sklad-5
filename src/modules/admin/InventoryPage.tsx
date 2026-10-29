@@ -20,6 +20,7 @@ import {
 } from '@/modules/admin/api'
 import type { Apartment, WarehouseStockRow } from '@/lib/database.types'
 import { ClipboardCheck, ChevronRight, X, Loader } from 'lucide-react'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 type Filter = 'all' | InventoryStatus
 
@@ -210,6 +211,7 @@ interface LineState extends InventoryLine {
 
 function InventorySheet({ inv, onClose, onChanged }: { inv: InventoryRow; onClose: () => void; onChanged: () => void }) {
   const { t, n } = useI18n()
+  const cat = useCatalogName()
   const [lines, setLines] = useState<LineState[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -281,8 +283,8 @@ function InventorySheet({ inv, onClose, onChanged }: { inv: InventoryRow; onClos
 
   const q = search.trim().toLowerCase()
   const shown = useMemo(
-    () => lines.filter((l) => !q || l.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name)),
-    [lines, q],
+    () => lines.filter((l) => !q || cat.matches(search.trim(), l.name, 'item')).sort((a, b) => a.name.localeCompare(b.name)),
+    [lines, q, cat, search],
   )
   const addable = stock.filter((s) => !lines.some((l) => l.item_id === s.item_id))
   const title = inv.scope === 'warehouse' ? t.admin.inventory.scopeWarehouse : `${t.admin.inventory.scopeApartment} ${inv.apartment_code ?? ''}`
@@ -318,7 +320,7 @@ function InventorySheet({ inv, onClose, onChanged }: { inv: InventoryRow; onClos
                 <div key={l.item_id} className="border border-line rounded-xl p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-ink">{l.name}</div>
+                      <div className="text-sm font-medium text-ink">{cat.itemName(l.name)}</div>
                       <div className="text-xs text-muted">{t.admin.inventory.expected}: {n(formatQty(l.expected, l))}</div>
                     </div>
                     {!isOpen && (
@@ -358,7 +360,7 @@ function InventorySheet({ inv, onClose, onChanged }: { inv: InventoryRow; onClos
           <div className="flex gap-2 mt-3">
             <select value={addId} onChange={(e) => setAddId(e.target.value)} className="flex-1 bg-app rounded-lg px-3 py-2.5 text-sm focus:outline-none min-w-0">
               <option value="">{t.admin.inventory.addItem}</option>
-              {addable.map((s) => <option key={s.item_id} value={s.item_id}>{s.name}</option>)}
+              {addable.map((s) => <option key={s.item_id} value={s.item_id}>{cat.itemName(s.name)}</option>)}
             </select>
             <button onClick={addItem} disabled={busy || !addId || dirty}
               className="bg-app text-ink rounded-lg px-4 text-sm font-medium disabled:opacity-40">{t.admin.inventory.add}</button>

@@ -15,6 +15,7 @@ import {
   initChargeState, applyPreview, buildChargePayload, canSubmit, computeAmount,
   type ChargeFormState,
 } from '@/modules/admin/chargeForm'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 const statusColors: Record<IncidentStatus, string> = {
   new: 'bg-warn-soft text-warn',
@@ -33,6 +34,7 @@ const kindIcons: Record<IncidentKind, React.ComponentType<{ className?: string }
 
 export function AdminIncidents() {
   const { t, n } = useI18n()
+  const cat = useCatalogName()
   const statusLabels: Record<IncidentStatus, string> = {
     new: t.incidents.statusNew,
     in_progress: t.incidents.statusInProgress,
@@ -236,7 +238,7 @@ export function AdminIncidents() {
                         <span className="text-sm font-medium text-ink">{aptMap.get(inc.apartment_id) ?? `#${n(String(inc.apartment_id))}`}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[inc.status]}`}>{statusLabels[inc.status]}</span>
                       </div>
-                      <p className="text-sm text-ink line-clamp-2">{inc.free_text ?? (inc.item_id != null ? (itemNames.get(inc.item_id) ?? `#${n(String(inc.item_id))}`) : '—')}</p>
+                      <p className="text-sm text-ink line-clamp-2">{inc.free_text ?? (inc.item_id != null ? (cat.itemName(itemNames.get(inc.item_id) ?? `#${n(String(inc.item_id))}`)) : '—')}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted">{kindLabels[inc.kind]}</span>
                         <span className="text-xs text-muted">·</span>

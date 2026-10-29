@@ -18,6 +18,7 @@ import { useLiveRefresh } from '@/lib/realtime'
 import { ArrowLeft, Printer, Upload, Trash2, FileText, Loader as Loader2 } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { OwnerBadge } from '@/components/OwnerBadge'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 interface DocMoveRow {
   id: number
@@ -43,6 +44,7 @@ export function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { t, n } = useI18n()
+  const cat = useCatalogName()
   const [doc, setDoc] = useState<DocumentWithSupplier | null>(null)
   const [moves, setMoves] = useState<DocMoveRow[]>([])
   const [attachments, setAttachments] = useState<AttachmentRow[]>([])
@@ -280,7 +282,7 @@ export function DocumentDetailPage() {
             {moves.map((mv) => (
               <div key={mv.id} className="flex items-start gap-3 py-2 border-t border-line first:border-t-0">
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-ink font-medium">{mv.item_name}</div>
+                  <div className="text-sm text-ink font-medium">{cat.itemName(mv.item_name)}</div>
                   <div className="text-xs text-muted">
                     {n(formatQty(mv.qty, {
                       base_unit: mv.item_base_unit,

@@ -6,6 +6,7 @@ import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
 import { startOutboxSync, stopOutboxSync } from '@/lib/outbox'
 import { setSentryUser } from '@/lib/sentry'
 import { currentDict } from '@/i18n'
+import { useCatalogNames } from './catalogNamesStore'
 
 type AuthState = 'loading' | 'bootstrap' | 'login' | 'ready' | 'no-connection'
 
@@ -70,6 +71,7 @@ export const useAuth = create<AuthStore>((set, get) => ({
         startOutboxSync(profile.id)
         setSentryUser(profile.id)
         set({ state: 'ready', profile, error: null })
+        void useCatalogNames.getState().load()
       } catch (e) {
         const apiError = toApiError(e)
         if (apiError.isNetwork) {
@@ -78,6 +80,7 @@ export const useAuth = create<AuthStore>((set, get) => ({
             startOutboxSync(cached.id)
             setSentryUser(cached.id)
             set({ state: 'ready', profile: cached, error: null })
+            void useCatalogNames.getState().load()
           } else {
             set({ state: 'no-connection', profile: null, error: null })
           }
@@ -135,13 +138,16 @@ export const useAuth = create<AuthStore>((set, get) => ({
       startOutboxSync(profile.id)
       setSentryUser(profile.id)
       set({ state: 'ready', profile, error: null })
+      void useCatalogNames.getState().load()
     } catch (e) {
       const apiError = toApiError(e)
       if (apiError.isNetwork) {
         const cached = await getCachedProfile()
         if (cached && cached.active && cached.id === session.user.id) {
           startOutboxSync(cached.id)
+          setSentryUser(cached.id)
           set({ state: 'ready', profile: cached, error: null })
+          void useCatalogNames.getState().load()
         } else {
           set({ error: currentDict().errors.network })
         }
@@ -190,6 +196,7 @@ export const useAuth = create<AuthStore>((set, get) => ({
     startOutboxSync(profile.id)
     setSentryUser(profile.id)
     set({ state: 'ready', profile, error: null })
+    void useCatalogNames.getState().load()
   },
 
   signOut: async () => {

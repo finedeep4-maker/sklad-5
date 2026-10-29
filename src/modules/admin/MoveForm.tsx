@@ -7,6 +7,7 @@ import { formatQty } from '@/lib/format'
 import { toast, errorMessage } from '@/lib/toast'
 import { lineSource, isTransferBlocked, transferOwnerFlags, buildOwnerStockMap, ownerAvailable, type MoveOp } from '@/modules/admin/moveRules'
 import { Plus, Minus, Trash2, Loader as Loader2, Check, X, FileText, TriangleAlert as AlertTriangle, Info } from 'lucide-react'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 
 function localToday(): string {
   const d = new Date()
@@ -40,6 +41,7 @@ type OwnershipMode = 'company' | 'owner'
 
 export function MoveModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { t, n } = useI18n()
+  const cat = useCatalogName()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const ops: MoveOpDef[] = [
@@ -105,7 +107,7 @@ export function MoveModal({ onClose, onDone }: { onClose: () => void; onDone: ()
   const showOwnerAptInfo = (op === 'issue_apartment' || op === 'return_apartment') && selectedAptIsOwner
 
   const filteredStock = useMemo(() => {
-    let list = stock.filter((s) => s.name.toLowerCase().includes(search.toLowerCase().trim()))
+    let list = stock.filter((s) => cat.matches(search.trim(), s.name, 'item'))
     if (showOwnershipToggle && ownership === 'owner') {
       list = list.filter((s) => s.kind === 'asset')
     }
@@ -113,7 +115,7 @@ export function MoveModal({ onClose, onDone }: { onClose: () => void; onDone: ()
       list = list.filter((s) => ownerAvailable(ownerStockMap, ownerAptId ?? -1, s.item_id) > 0)
     }
     return list.slice(0, 20)
-  }, [stock, search, showOwnershipToggle, ownership, op, ownerStockMap, ownerAptId])
+  }, [stock, search, showOwnershipToggle, ownership, op, ownerStockMap, ownerAptId, cat])
 
   const addToCart = (item: WarehouseStockRow) => {
     const meta = itemMeta.get(item.item_id)
@@ -185,7 +187,7 @@ export function MoveModal({ onClose, onDone }: { onClose: () => void; onDone: ()
       const invalid: string[] = []
       for (const line of cart) {
         if (nextDef.op === 'receipt' || nextDef.op === 'writeoff_warehouse') {
-          if (ownership === 'owner' && line.kind === 'consumable') invalid.push(line.itemName)
+          if (ownership === 'owner' && line.kind === 'consumable') invalid.push(cat.itemName(line.itemName))
         }
       }
       if (invalid.length > 0) {
@@ -199,7 +201,7 @@ export function MoveModal({ onClose, onDone }: { onClose: () => void; onDone: ()
     if (next === 'owner' && cart.length > 0) {
       const consumables = cart.filter((l) => l.kind === 'consumable')
       if (consumables.length > 0) {
-        toast(t.admin.move.ownerConsumablesHidden + ' (' + consumables.map((l) => l.itemName).join(', ') + ')', 'error')
+        toast(t.admin.move.ownerConsumablesHidden + ' (' + consumables.map((l) => cat.itemName(l.itemName)).join(', ') + ')', 'error')
       }
     }
     setOwnership(next)
@@ -526,7 +528,7 @@ export function MoveModal({ onClose, onDone }: { onClose: () => void; onDone: ()
                       onClick={() => { addToCart(s); setSearch('') }}
                       className="w-full px-4 py-2.5 flex items-center justify-between text-start hover:bg-app border-b border-line last:border-0"
                     >
-                      <span className="text-sm text-ink truncate">{s.name}</span>
+                      <span className="text-sm text-ink truncate">{cat.itemName(s.name)}</span>
                       <span className="text-xs text-muted shrink-0 ms-2">{n(formatQty(availLabel, s))}</span>
                     </button>
                   )
@@ -550,7 +552,7 @@ export function MoveModal({ onClose, onDone }: { onClose: () => void; onDone: ()
                 return (
                   <div key={line.itemId} className="bg-surface rounded-lg border border-line px-3 py-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-ink">{line.itemName}</span>
+                      <span className="text-sm font-medium text-ink">{cat.itemName(line.itemName)}</span>
                       <button onClick={() => removeLine(idx)} className="text-bad p-1" aria-label={t.admin.apartments.delete}>
                         <Trash2 className="w-4 h-4" />
                       </button>

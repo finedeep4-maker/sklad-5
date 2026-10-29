@@ -834,6 +834,11 @@ export const ar: Dict = {
       tenantCoefInvalid: 'رقم أكبر من صفر، لحد ٣ كسور عشرية، مش أكتر من ٩٩٩٩٩.٩٩٩',
       tenantCoefFromCategory: 'من الفئة',
       tenantCoefExampleFmt: 'شراء ١٠٠ → الساكن {amount}',
+      nameEn: 'الاسم (English)',
+      nameAr: 'الاسم (العربية)',
+      nameTranslationHint: 'لو الترجمة فاضية، بيظهر الاسم الروسي',
+      searchPlaceholder: 'دوّر بالاسم (روسي، en، ar)',
+      noSearchResults: 'مفيش نتايج',
     },
     orders: {
       title: 'أوامر الشراء',
