@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Loader as Loader2, X, Trash2, Camera, Video, RotateCcw } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { formatDateTime, formatQty } from '@/lib/format'
 import { friendlyMessage, toApiError } from '@/lib/errors'
 import { toast, errorMessage } from '@/lib/toast'
@@ -26,6 +27,7 @@ function isVideoPath(path: string): boolean {
 
 export function CleaningDetailSheet({ event, canDelete, onClose, onDeleted, onRecalculate, onReverse }: Props) {
   const { t, n } = useI18n()
+  const { itemName } = useCatalogName()
   const [lines, setLines] = useState<SvCleaningEventLineRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showMedia, setShowMedia] = useState(false)
@@ -127,7 +129,7 @@ export function CleaningDetailSheet({ event, canDelete, onClose, onDeleted, onRe
                 {lines.map((line) => (
                   <div key={`${line.event_id}-${line.item_id}`} className="px-3 py-2.5 flex items-center justify-between">
                     <div className="min-w-0">
-                      <span className="text-sm text-ink">{line.item_name ?? `#${line.item_id}`}</span>
+                      <span className="text-sm text-ink">{line.item_name ? itemName(line.item_name) : `#${line.item_id}`}</span>
                       <span className="text-xs text-muted block">{normTypeLabels[line.norm_type]}</span>
                     </div>
                     <span className="text-sm text-muted shrink-0">

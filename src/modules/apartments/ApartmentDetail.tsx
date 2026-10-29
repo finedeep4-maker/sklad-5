@@ -4,6 +4,7 @@ import { fetchApartmentById, fetchNorms, fetchNotes, addNote } from '@/modules/a
 import type { SvApartment, SvNorm, ApartmentNote, NormType } from '@/lib/database.types'
 import { useAuth } from '@/modules/core/store'
 import { useI18n } from '@/i18n'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { formatDateTime, isToday, formatQty } from '@/lib/format'
 import { toast } from '@/lib/toast'
 import { ArrowLeft, Wrench, Sparkles, ClipboardList, Send, CircleCheck as CheckCircle2, History, Boxes } from 'lucide-react'
@@ -21,6 +22,7 @@ const normTypeOrder: NormType[] = ['asset_standing', 'turnover_replenish', 'clea
 
 export function ApartmentDetail() {
   const { t, n } = useI18n()
+  const { itemName } = useCatalogName()
   const normTypeLabels: Record<NormType, string> = {
     asset_standing: t.apartments.normInventory,
     turnover_replenish: t.apartments.normTurnover,
@@ -128,7 +130,7 @@ export function ApartmentDetail() {
                   <div className="bg-surface rounded-xl border border-line divide-y divide-[var(--line)]">
                     {items.map((nr) => (
                       <div key={`${nr.item_id}-${nr.norm_type}`} className="px-4 py-3 flex items-center justify-between">
-                        <span className="text-sm text-ink">{nr.item_name}</span>
+                        <span className="text-sm text-ink">{itemName(nr.item_name)}</span>
                         <span className="text-sm text-muted">
                           {n(formatQty(nr.qty, { base_unit: nr.base_unit, pack_size: nr.pack_size, pack_label: nr.pack_label }))}
                         </span>

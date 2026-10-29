@@ -8,6 +8,7 @@ import { completeCleaning, queueCleaningOffline, isNetworkError } from '@/module
 import { useAuth } from '@/modules/core/store'
 import type { SvNorm, SvStaff, NormType, CleaningResult } from '@/lib/database.types'
 import { useI18n, currentDict } from '@/i18n'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { friendlyMessage } from '@/lib/errors'
 import { formatQty } from '@/lib/format'
 import { validateCleaningMedia, isVideoFile, isHeicFile } from '@/lib/files'
@@ -21,6 +22,7 @@ const MAX_TOTAL_MEDIA_SIZE = 150 * 1024 * 1024
 
 export function CleaningSheet({ backTo }: { backTo?: string }) {
   const { t, n } = useI18n()
+  const { itemName } = useCatalogName()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const profile = useAuth((s) => s.profile)
@@ -319,7 +321,7 @@ export function CleaningSheet({ backTo }: { backTo?: string }) {
               <div className="bg-app rounded-xl border border-line divide-y divide-[var(--line)]">
                 {writeoffItems.map((nr) => (
                   <div key={`${nr.item_id}-${nr.norm_type}`} className="px-3 py-2.5 flex items-center justify-between">
-                    <span className="text-sm text-ink">{nr.item_name}</span>
+                    <span className="text-sm text-ink">{itemName(nr.item_name)}</span>
                     <span className="text-sm text-muted">{n(formatQty(nr.qty, { base_unit: nr.base_unit, pack_size: nr.pack_size, pack_label: nr.pack_label }))}</span>
                   </div>
                 ))}
@@ -387,7 +389,7 @@ export function CleaningSheet({ backTo }: { backTo?: string }) {
           {result?.shortages && result.shortages.length > 0 && (
             <div className="bg-warn-soft border border-line rounded-xl px-3 py-2.5">
               <p className="text-sm font-medium text-warn mb-1">{t.cleaning.shortages}</p>
-              {result.shortages.map((s) => <p key={s.item_id} className="text-xs text-warn">{s.item}: {n(String(s.balance))}</p>)}
+              {result.shortages.map((s) => <p key={s.item_id} className="text-xs text-warn">{itemName(s.item)}: {n(String(s.balance))}</p>)}
             </div>
           )}
         </div>

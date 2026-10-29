@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 import { Loader as Loader2, X, Trash2, Camera, Video } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { formatDateTime } from '@/lib/format'
 import { toApiError } from '@/lib/errors'
 import { toast, errorMessage } from '@/lib/toast'
@@ -24,6 +25,7 @@ function isVideoPath(path: string): boolean {
 
 export function IncidentDetailSheet({ incident, canDelete, onClose, onDeleted }: Props) {
   const { t, n } = useI18n()
+  const { itemName } = useCatalogName()
   const [showMedia, setShowMedia] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [reason, setReason] = useState('')
@@ -98,7 +100,7 @@ export function IncidentDetailSheet({ incident, canDelete, onClose, onDeleted }:
           </div>
           {incident.author_name && <DetailRow label={t.qr.detailAuthor} value={incident.author_name} />}
           <DetailRow label={t.qr.detailKind} value={kindLabels[incident.kind]} />
-          {incident.item_name && <DetailRow label={t.qr.detailItem} value={incident.item_name} />}
+          {incident.item_name && <DetailRow label={t.qr.detailItem} value={itemName(incident.item_name)} />}
           {incident.free_text && <DetailRow label={t.incidents.freeText} value={incident.free_text} />}
           <DetailRow label={t.qr.detailQty} value={n(String(incident.qty))} />
           {incident.comment && <DetailRow label={t.qr.detailComment} value={incident.comment} />}

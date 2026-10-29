@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader as Loader2, ChevronDown } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { useCatalogName } from '@/modules/core/useCatalogName'
 import { formatDateTime } from '@/lib/format'
 import { friendlyMessage } from '@/lib/errors'
 import { fetchIncidentHistory } from './api'
@@ -19,6 +20,7 @@ interface Props {
 
 export function IncidentHistoryList({ apartmentId, canDelete, refreshKey }: Props) {
   const { t, n } = useI18n()
+  const { itemName } = useCatalogName()
   const [filters, setFilters] = useState<Filters>(emptyIncidentFilters())
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [rows, setRows] = useState<SvApartmentIncidentRow[]>([])
@@ -158,7 +160,7 @@ export function IncidentHistoryList({ apartmentId, canDelete, refreshKey }: Prop
                 </span>
               </div>
               <p className="text-xs text-muted">{kindDisplay[inc.kind]}</p>
-              {inc.item_name && <p className="text-xs text-muted">{inc.item_name}</p>}
+              {inc.item_name && <p className="text-xs text-muted">{itemName(inc.item_name)}</p>}
               {inc.author_name && <p className="text-xs text-muted">{t.qr.detailAuthor}: {inc.author_name}</p>}
             </button>
           ))}
