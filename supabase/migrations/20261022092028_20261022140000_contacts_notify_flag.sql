@@ -1,0 +1,1 @@
+alter table contacts add column if not exists notify_on_events boolean not null default false;

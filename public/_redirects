@@ -1,0 +1,3 @@
+/qr/*    /qr.html#/qr/:splat   301
+/qr      /qr.html#/qr          301
+/*       /index.html           200

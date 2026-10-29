@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit -p tsconfig.app.json
+      - run: npx eslint .
+      - run: npm run check:i18n
+      - run: npm test
+      - run: npx vite build
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      HAS_E2E: ${{ secrets.E2E_SUPABASE_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+        if: env.HAS_E2E == 'true'
+      - run: npm run build
+        if: env.HAS_E2E == 'true'
+      - run: |
+          npx vite preview --port 4173 &
+          npx wait-on http://localhost:4173
+        if: env.HAS_E2E == 'true'
+      - run: npx playwright test
+        if: env.HAS_E2E == 'true'
+        env:
+          E2E_ALLOW: '1'
+          E2E_BASE_URL: http://localhost:4173
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          E2E_ADMIN_LOGIN: ${{ secrets.E2E_ADMIN_LOGIN }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_SV_LOGIN: ${{ secrets.E2E_SV_LOGIN }}
+          E2E_SV_PASSWORD: ${{ secrets.E2E_SV_PASSWORD }}
+          E2E_QR_APARTMENT_ID: ${{ secrets.E2E_QR_APARTMENT_ID }}
+          E2E_DISABLED_LOGIN: ${{ secrets.E2E_DISABLED_LOGIN }}
+          E2E_DISABLED_PASSWORD: ${{ secrets.E2E_DISABLED_PASSWORD }}
