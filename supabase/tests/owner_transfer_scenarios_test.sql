@@ -72,6 +72,13 @@ begin
   rep := rep || pg_temp.r('T3 себестоимость = owner_avg_cost = 100',
     (select unit_cost from stock_moves where source_type = 'owner_transfer' and to_loc = l_wh order by id desc limit 1) = 100);
 
+  -- T3b отчёт оборота до сторно: перенос туда 2, обратно 1
+  j := report_stock_turnover('1900-01-01'::date, '2100-01-01'::date, 'owner', v_O);
+  rep := rep || pg_temp.r('T3b turnover owner: transfer_in_qty = 2',
+    (select (e->>'transfer_in_qty')::numeric from jsonb_array_elements(j) e where (e->>'item_id')::int = v_A) = 2);
+  rep := rep || pg_temp.r('T3b turnover owner: transfer_out_qty = 1',
+    (select (e->>'transfer_out_qty')::numeric from jsonb_array_elements(j) e where (e->>'item_id')::int = v_A) = 1);
+
   -- T4 нехватка остатка
   t := null;
   begin
@@ -120,6 +127,19 @@ begin
   rep := rep || pg_temp.r('T7 void T2: документ void', (select status from documents where id = v_doc) = 'void');
   rep := rep || pg_temp.r('T7 void T2: полка owner = 0', _bal(l_os, v_A) = 0);
   rep := rep || pg_temp.r('T7 void T2: склад = 3', _bal(l_wh, v_A) = 3);
+
+  -- T7b отменённые переносы не попадают в отчёт оборота
+  j := report_stock_turnover('1900-01-01'::date, '2100-01-01'::date, 'owner', v_O);
+  rep := rep || pg_temp.r('T7b turnover owner после сторно: переносов нет',
+    coalesce((select sum((e->>'transfer_in_qty')::numeric + (e->>'transfer_out_qty')::numeric) from jsonb_array_elements(j) e), 0) = 0);
+
+  -- T11 _insert_move недоступна клиентским ролям
+  rep := rep || pg_temp.r('T11 _insert_move не выполняется authenticated',
+    not has_function_privilege('authenticated',
+      'public._insert_move(integer,integer,integer,numeric,numeric,text,text,integer,integer,uuid,text,timestamp with time zone,bigint)', 'EXECUTE'));
+  rep := rep || pg_temp.r('T11 _insert_move не выполняется anon',
+    not has_function_privilege('anon',
+      'public._insert_move(integer,integer,integer,numeric,numeric,text,text,integer,integer,uuid,text,timestamp with time zone,bigint)', 'EXECUTE'));
 
   -- T9 report_owner_vs_company
   j := report_owner_vs_company(null, null);
