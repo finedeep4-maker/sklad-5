@@ -26,7 +26,7 @@
 - Data snapshot: 191 items total, 180 assets, 0 untranslated assets, 211 norm rules, 22 active apartments (studio 9, 1br 10, 2br 3)
 
 ### Deployed DB functions (public schema)
-- `_insert_move` — core movement insert; warehouse allowed as from/to for owner assets only when `p_src in ('owner_transfer', 'doc_void')`; other source types restricted
+- `_insert_move` — core movement insert; warehouse allowed as from/to for owner assets only when `p_src in ('owner_transfer', 'doc_void')`; other source types restricted. **`authenticated` role EXECUTE privilege revoked** — function is internal-only, not callable from frontend
 - `void_document` — admin-only; checks balance before reversing; uses `source_type='doc_void'`; marks document `void`
 - `transfer_company_owner` — admin-only; validates owner apartment; creates `issue` document; uses `avg_cost` (to_owner) / `owner_avg_cost` (to_company); `source_type='owner_transfer'`
 - `report_stock_turnover` — admin-only; supports `company`/`owner` scopes; separates receipt/out/transfer quantities and values
@@ -41,3 +41,4 @@
 - Category `kind` values include at least `'asset'` (others not enumerated)
 - Business logic for owner scenario, stock calculation for company warehouse, and task-document acceptance criteria remain partially verified (function defs now confirmed)
 - No UI design decisions established yet
+- Frontend must call wrapper functions (e.g., `void_document`, `transfer_company_owner`) instead of `_insert_move` directly
