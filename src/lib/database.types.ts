@@ -439,3 +439,60 @@ export interface OwnerStockRow {
   base_unit: BaseUnit
   qty: number
 }
+
+export interface ItemPrice {
+  item_id: number
+  guest_price: number
+  updated_at: string
+}
+
+export interface WarehouseValuationRow {
+  scope: 'company' | 'owner'
+  owner_apartment_id: number | null
+  item_id: number
+  on_hand: number
+  min_stock: number | null
+  avg_cost: number | null
+  guest_price: number | null
+  stock_value: number | null
+  potential_revenue: number | null
+  margin: number | null
+}
+
+export interface TransferCompanyOwnerResult {
+  doc_id: string
+}
+
+export interface StockTurnoverRow {
+  item_id: number
+  item_name: string
+  category: string
+  in_qty: number
+  out_qty: number
+  transfer_in_qty: number
+  transfer_out_qty: number
+  in_value: number
+  out_value: number
+  transfer_in_value: number
+  transfer_out_value: number
+}
+
+export interface OwnerVsCompanyReport {
+  company: {
+    total_items: number
+    stock_value: number
+    potential_revenue: number
+  }
+  owner: {
+    total_apartments: number
+    total_items: number
+    stock_value: number
+    potential_revenue: number
+  }
+  transfers: {
+    to_owner_count: number
+    to_company_count: number
+    to_owner_value: number
+    to_company_value: number
+  }
+}

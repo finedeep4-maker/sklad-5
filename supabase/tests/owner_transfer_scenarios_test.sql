@@ -1,0 +1,137 @@
+-- Проверка transfer_company_owner, item_prices, warehouse_valuation, report RPCs.
+-- Запускать в Supabase SQL Editor на ТЕСТОВОЙ БД.
+-- Скрипт сам откатывает все данные: в конце намеренно падает с ошибкой "ОТЧЁТ", в тексте — результаты.
+create or replace function pg_temp.r(n text, c boolean) returns text language sql as
+$$ select case when coalesce(c, false) then 'OK    ' else 'FAIL  ' end || n || E'\n' $$;
+
+do $$
+declare
+  v_admin uuid; rep text := ''; t text; j jsonb; v_doc uuid;
+  v_bld int; v_O int; v_R int; v_ca int; v_A int; v_B int;
+  l_wh int; l_os int; l_R int;
+begin
+  select id into v_admin from profiles where role = 'admin' and active limit 1;
+  if v_admin is null then
+    v_admin := gen_random_uuid();
+    insert into auth.users(id, email) values (v_admin, 'zz-tr-admin@example.invalid');
+    insert into profiles(id, login, full_name, role) values (v_admin, 'zz-tr-admin', 'ZZ TR Admin', 'admin');
+  end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+
+  -- данные
+  insert into buildings(name) values ('ZZTR') returning id into v_bld;
+  insert into apartments(building_id, number, code, type) values (v_bld, '1', 'ZZTR/1', 'studio') returning id into v_O;
+  insert into apartments(building_id, number, code, type) values (v_bld, '2', 'ZZTR/2', 'studio') returning id into v_R;
+  update apartments set is_owner = true where id = v_O;
+  insert into categories(name, kind) values ('ZZ актив', 'asset') returning id into v_ca;
+  insert into items(category_id, name) values (v_ca, 'ZZ TR-A') returning id into v_A;
+  insert into items(category_id, name) values (v_ca, 'ZZ TR-B') returning id into v_B;
+  insert into tenant_coefs(item_id, coef) values (v_A, 2.0);
+
+  l_wh := _loc_singleton('warehouse');
+  l_os := _loc_owner_stock(v_O);
+  l_R  := _loc_apartment(v_R);
+
+  -- T1 item_prices
+  perform post_move(p_op => 'receipt', p_item => v_A, p_qty => 3, p_unit_cost => 100);
+  perform post_move(p_op => 'receipt', p_item => v_B, p_qty => 1, p_unit_cost => 50);
+  insert into item_prices(item_id, guest_price) values (v_A, 200) on conflict do nothing;
+  insert into item_prices(item_id, guest_price) values (v_B, 75) on conflict do nothing;
+  rep := rep || pg_temp.r('T1 item_prices для A = 200', (select guest_price from item_prices where item_id = v_A) = 200);
+  rep := rep || pg_temp.r('T1 item_prices для B = 75', (select guest_price from item_prices where item_id = v_B) = 75);
+
+  -- T2 transfer to_owner
+  v_doc := transfer_company_owner('to_owner', v_O, jsonb_build_array(
+    jsonb_build_object('item_id', v_A, 'qty', 2)
+  ), 'Тест перенос');
+  rep := rep || pg_temp.r('T2 документ создан', v_doc is not null);
+  rep := rep || pg_temp.r('T2 полка owner = 2', _bal(l_os, v_A) = 2);
+  rep := rep || pg_temp.r('T2 склад компании = 1', _bal(l_wh, v_A) = 1);
+  rep := rep || pg_temp.r('T2 движение помечено owner',
+    (select owner_apartment_id from stock_moves where source_type = 'owner_transfer' order by id desc limit 1) = v_O);
+  rep := rep || pg_temp.r('T2 source_type = owner_transfer',
+    (select source_type from stock_moves where source_type = 'owner_transfer' order by id desc limit 1) = 'owner_transfer');
+  rep := rep || pg_temp.r('T2 себестоимость = avg_cost = 100',
+    (select unit_cost from stock_moves where source_type = 'owner_transfer' order by id desc limit 1) = 100);
+
+  -- T3 transfer to_company
+  v_doc := transfer_company_owner('to_company', v_O, jsonb_build_array(
+    jsonb_build_object('item_id', v_A, 'qty', 1)
+  ), 'Возврат');
+  rep := rep || pg_temp.r('T3 полка owner = 1', _bal(l_os, v_A) = 1);
+  rep := rep || pg_temp.r('T3 склад компании = 2', _bal(l_wh, v_A) = 2);
+  rep := rep || pg_temp.r('T3 себестоимость = owner_avg_cost = 100',
+    (select unit_cost from stock_moves where source_type = 'owner_transfer' and to_loc = l_wh order by id desc limit 1) = 100);
+
+  -- T4 нехватка остатка
+  t := null;
+  begin
+    perform transfer_company_owner('to_owner', v_O, jsonb_build_array(
+      jsonb_build_object('item_id', v_A, 'qty', 100)
+    ));
+  exception when others then t := sqlerrm; end;
+  rep := rep || pg_temp.r('T4 нехватка на складе компании', t like '%Не хватает на складе компании%');
+
+  t := null;
+  begin
+    perform transfer_company_owner('to_company', v_O, jsonb_build_array(
+      jsonb_build_object('item_id', v_A, 'qty', 100)
+    ));
+  exception when others then t := sqlerrm; end;
+  rep := rep || pg_temp.r('T4b нехватка на owner-складе', t like '%Нет на складе owner%');
+
+  -- T5 не-owner квартира
+  t := null;
+  begin
+    perform transfer_company_owner('to_owner', v_R, jsonb_build_array(
+      jsonb_build_object('item_id', v_A, 'qty', 1)
+    ));
+  exception when others then t := sqlerrm; end;
+  rep := rep || pg_temp.r('T5 не-owner квартира отклонена', t like '%не является owner-квартирой%');
+
+  -- T6 не-админ
+  perform set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-000000000000', 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000000', true);
+  t := null;
+  begin
+    perform transfer_company_owner('to_owner', v_O, jsonb_build_array(
+      jsonb_build_object('item_id', v_A, 'qty', 1)
+    ));
+  exception when others then t := sqlerrm; end;
+  rep := rep || pg_temp.r('T6 не-админ отклонён', t like '%Только администратор%');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+
+  -- T7 сторно документа
+  select id into v_doc from documents
+   where note like '%Тест перенос%' and status = 'posted'
+   order by created_at desc limit 1;
+  if v_doc is not null then
+    perform void_document(v_doc, 'Тест сторно');
+    rep := rep || pg_temp.r('T7 сторно: документ void', (select status from documents where id = v_doc) = 'void');
+    rep := rep || pg_temp.r('T7 сторно: полка owner = 0', _bal(l_os, v_A) = 0);
+  else
+    rep := rep || pg_temp.r('T7 сторно: документ не найден', false);
+  end if;
+
+  -- T8 warehouse_valuation
+  rep := rep || pg_temp.r('T8 view company scope',
+    (select count(*) > 0 from warehouse_valuation where scope = 'company' and on_hand > 0));
+  rep := rep || pg_temp.r('T8 view owner scope',
+    (select count(*) > 0 from warehouse_valuation where scope = 'owner' and on_hand > 0));
+
+  -- T9 report_owner_vs_company
+  j := report_owner_vs_company(null, null);
+  rep := rep || pg_temp.r('T9 report есть company.stock_value', (j->'company'->>'stock_value') is not null);
+  rep := rep || pg_temp.r('T9 report есть owner.stock_value', (j->'owner'->>'stock_value') is not null);
+  rep := rep || pg_temp.r('T9 report есть transfers', (j->'transfers'->>'to_owner_count') is not null);
+
+  -- T10 report_stock_turnover
+  j := report_stock_turnover('1900-01-01'::date, '2100-01-01'::date, 'company', null);
+  rep := rep || pg_temp.r('T10 turnover company возвращает массив', jsonb_typeof(j) = 'array');
+  j := report_stock_turnover('1900-01-01'::date, '2100-01-01'::date, 'owner', v_O);
+  rep := rep || pg_temp.r('T10 turnover owner возвращает массив', jsonb_typeof(j) = 'array');
+
+  raise exception E'ОТЧЁТ (данные откатаны):\n%', rep;
+end $$;
