@@ -1,12 +1,14 @@
 -- Проверка transfer_company_owner, item_prices, warehouse_valuation, report RPCs.
 -- Запускать в Supabase SQL Editor на ТЕСТОВОЙ БД.
 -- Скрипт сам откатывает все данные: в конце намеренно падает с ошибкой "ОТЧЁТ", в тексте — результаты.
+-- T8 (warehouse_valuation) проверяется ДО сторно, пока на полке owner есть остатки.
+-- T7 (void) сторнирует документы в обратном порядке: сначала T3 (to_company), потом T2 (to_owner).
 create or replace function pg_temp.r(n text, c boolean) returns text language sql as
 $$ select case when coalesce(c, false) then 'OK    ' else 'FAIL  ' end || n || E'\n' $$;
 
 do $$
 declare
-  v_admin uuid; rep text := ''; t text; j jsonb; v_doc uuid;
+  v_admin uuid; rep text := ''; t text; j jsonb; v_doc uuid; v_doc2 uuid;
   v_bld int; v_O int; v_R int; v_ca int; v_A int; v_B int;
   l_wh int; l_os int; l_R int;
 begin
@@ -44,7 +46,7 @@ begin
   -- T2 transfer to_owner
   v_doc := transfer_company_owner('to_owner', v_O, jsonb_build_array(
     jsonb_build_object('item_id', v_A, 'qty', 2)
-  ), 'Тест перенос');
+  ), 'ZZTR test transfer');
   rep := rep || pg_temp.r('T2 документ создан', v_doc is not null);
   rep := rep || pg_temp.r('T2 полка owner = 2', _bal(l_os, v_A) = 2);
   rep := rep || pg_temp.r('T2 склад компании = 1', _bal(l_wh, v_A) = 1);
@@ -55,10 +57,16 @@ begin
   rep := rep || pg_temp.r('T2 себестоимость = avg_cost = 100',
     (select unit_cost from stock_moves where source_type = 'owner_transfer' order by id desc limit 1) = 100);
 
+  -- T8 warehouse_valuation (проверяем ДО сторно, пока на полке owner есть остатки)
+  rep := rep || pg_temp.r('T8 view company scope',
+    (select count(*) > 0 from warehouse_valuation where scope = 'company' and on_hand > 0));
+  rep := rep || pg_temp.r('T8 view owner scope',
+    (select count(*) > 0 from warehouse_valuation where scope = 'owner' and on_hand > 0 and owner_apartment_id = v_O));
+
   -- T3 transfer to_company
-  v_doc := transfer_company_owner('to_company', v_O, jsonb_build_array(
+  v_doc2 := transfer_company_owner('to_company', v_O, jsonb_build_array(
     jsonb_build_object('item_id', v_A, 'qty', 1)
-  ), 'Возврат');
+  ), 'ZZTR return');
   rep := rep || pg_temp.r('T3 полка owner = 1', _bal(l_os, v_A) = 1);
   rep := rep || pg_temp.r('T3 склад компании = 2', _bal(l_wh, v_A) = 2);
   rep := rep || pg_temp.r('T3 себестоимость = owner_avg_cost = 100',
@@ -71,7 +79,7 @@ begin
       jsonb_build_object('item_id', v_A, 'qty', 100)
     ));
   exception when others then t := sqlerrm; end;
-  rep := rep || pg_temp.r('T4 нехватка на складе компании', t like '%Не хватает на складе компании%');
+  rep := rep || pg_temp.r('T4 нехватка на складе компании', t is not null and t like '%Не хватает на складе компании%');
 
   t := null;
   begin
@@ -79,7 +87,7 @@ begin
       jsonb_build_object('item_id', v_A, 'qty', 100)
     ));
   exception when others then t := sqlerrm; end;
-  rep := rep || pg_temp.r('T4b нехватка на owner-складе', t like '%Нет на складе owner%');
+  rep := rep || pg_temp.r('T4b нехватка на owner-складе', t is not null and t like '%Нет на складе owner%');
 
   -- T5 не-owner квартира
   t := null;
@@ -88,7 +96,7 @@ begin
       jsonb_build_object('item_id', v_A, 'qty', 1)
     ));
   exception when others then t := sqlerrm; end;
-  rep := rep || pg_temp.r('T5 не-owner квартира отклонена', t like '%не является owner-квартирой%');
+  rep := rep || pg_temp.r('T5 не-owner квартира отклонена', t is not null and t like '%не является owner-квартирой%');
 
   -- T6 не-админ
   perform set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-000000000000', 'role', 'authenticated')::text, true);
@@ -99,27 +107,19 @@ begin
       jsonb_build_object('item_id', v_A, 'qty', 1)
     ));
   exception when others then t := sqlerrm; end;
-  rep := rep || pg_temp.r('T6 не-админ отклонён', t like '%Только администратор%');
+  rep := rep || pg_temp.r('T6 не-админ отклонён', t is not null and t like '%Только администратор%');
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', v_admin::text, true);
 
-  -- T7 сторно документа
-  select id into v_doc from documents
-   where note like '%Тест перенос%' and status = 'posted'
-   order by created_at desc limit 1;
-  if v_doc is not null then
-    perform void_document(v_doc, 'Тест сторно');
-    rep := rep || pg_temp.r('T7 сторно: документ void', (select status from documents where id = v_doc) = 'void');
-    rep := rep || pg_temp.r('T7 сторно: полка owner = 0', _bal(l_os, v_A) = 0);
-  else
-    rep := rep || pg_temp.r('T7 сторно: документ не найден', false);
-  end if;
+  -- T7 сторно документов в обратном порядке: сначала T3 (to_company), потом T2 (to_owner)
+  perform void_document(v_doc2, 'ZZTR void T3');
+  rep := rep || pg_temp.r('T7 void T3: документ void', (select status from documents where id = v_doc2) = 'void');
+  rep := rep || pg_temp.r('T7 void T3: полка owner = 2', _bal(l_os, v_A) = 2);
 
-  -- T8 warehouse_valuation
-  rep := rep || pg_temp.r('T8 view company scope',
-    (select count(*) > 0 from warehouse_valuation where scope = 'company' and on_hand > 0));
-  rep := rep || pg_temp.r('T8 view owner scope',
-    (select count(*) > 0 from warehouse_valuation where scope = 'owner' and on_hand > 0));
+  perform void_document(v_doc, 'ZZTR void T2');
+  rep := rep || pg_temp.r('T7 void T2: документ void', (select status from documents where id = v_doc) = 'void');
+  rep := rep || pg_temp.r('T7 void T2: полка owner = 0', _bal(l_os, v_A) = 0);
+  rep := rep || pg_temp.r('T7 void T2: склад = 3', _bal(l_wh, v_A) = 3);
 
   -- T9 report_owner_vs_company
   j := report_owner_vs_company(null, null);
