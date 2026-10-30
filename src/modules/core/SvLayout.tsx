@@ -52,7 +52,7 @@ export function SvLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <main className="flex-1 pb-20 max-w-lg mx-auto w-full">{children}</main>
-      <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-line z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-line z-40">
         <div className="max-w-lg mx-auto flex">
           {tabs.map((tab) => {
             const active = tab.end ? pathname === tab.to : pathname.startsWith(tab.to)

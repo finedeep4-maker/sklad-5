@@ -371,8 +371,8 @@ export function EditApartmentModal({ apartment, buildings, typeLabels, onClose, 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-6">
-      <div className="bg-surface rounded-2xl w-full max-w-sm p-5 border border-line">
+    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center px-6">
+      <div className="bg-surface rounded-2xl w-full max-w-sm max-h-[90dvh] overflow-y-auto p-5 border border-line">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-ink">{t.admin.apartments.editTitle}</h3>
           <button onClick={onClose}><X className="w-5 h-5 text-muted" /></button>

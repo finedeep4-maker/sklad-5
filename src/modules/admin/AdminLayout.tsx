@@ -72,7 +72,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile bottom bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-line z-50 flex no-print">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-line z-40 flex no-print">
         {tabs.map((tab) => {
           const active = tab.end ? pathname === tab.to : pathname.startsWith(tab.to)
           const Icon = tab.icon

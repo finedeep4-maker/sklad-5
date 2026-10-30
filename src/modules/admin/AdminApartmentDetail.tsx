@@ -195,9 +195,9 @@ export function AdminApartmentDetail() {
               {apartment.is_owner && <OwnerBadge />}
               <button
                 onClick={() => setEditingApt(apartment)}
-                className="ms-auto p-1.5 rounded-lg border border-line text-muted hover:text-accent flex items-center gap-1 text-xs"
+                className="ms-auto px-3 py-2 min-h-[44px] rounded-lg border border-line text-muted hover:text-accent flex items-center gap-1.5 text-sm"
               >
-                <Edit3 className="w-3.5 h-3.5" />
+                <Edit3 className="w-4 h-4" />
                 {t.admin.apartments.edit}
               </button>
             </div>
