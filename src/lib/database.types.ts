@@ -456,7 +456,8 @@ export interface WarehouseValuationRow {
   guest_price: number | null
   stock_value: number | null
   potential_revenue: number | null
-  margin: number | null
+  markup_pct: number | null
+  margin_pct: number | null
 }
 
 export interface TransferCompanyOwnerResult {

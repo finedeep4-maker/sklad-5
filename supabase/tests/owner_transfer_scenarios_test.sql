@@ -10,6 +10,7 @@ do $$
 declare
   v_admin uuid; rep text := ''; t text; j jsonb; v_doc uuid; v_doc2 uuid;
   v_bld int; v_O int; v_R int; v_ca int; v_A int; v_B int;
+  v_cc int; v_C int;
   l_wh int; l_os int; l_R int;
 begin
   select id into v_admin from profiles where role = 'admin' and active limit 1;
@@ -27,8 +28,10 @@ begin
   insert into apartments(building_id, number, code, type) values (v_bld, '2', 'ZZTR/2', 'studio') returning id into v_R;
   update apartments set is_owner = true where id = v_O;
   insert into categories(name, kind) values ('ZZ актив', 'asset') returning id into v_ca;
+  insert into categories(name, kind) values ('ZZ расходник', 'consumable') returning id into v_cc;
   insert into items(category_id, name) values (v_ca, 'ZZ TR-A') returning id into v_A;
   insert into items(category_id, name) values (v_ca, 'ZZ TR-B') returning id into v_B;
+  insert into items(category_id, name) values (v_cc, 'ZZ TR-C') returning id into v_C;
   insert into tenant_coefs(item_id, coef) values (v_A, 2.0);
 
   l_wh := _loc_singleton('warehouse');
@@ -38,10 +41,12 @@ begin
   -- T1 item_prices
   perform post_move(p_op => 'receipt', p_item => v_A, p_qty => 3, p_unit_cost => 100);
   perform post_move(p_op => 'receipt', p_item => v_B, p_qty => 1, p_unit_cost => 50);
+  perform post_move(p_op => 'receipt', p_item => v_C, p_qty => 5, p_unit_cost => 10);
   insert into item_prices(item_id, guest_price) values (v_A, 200) on conflict do nothing;
   insert into item_prices(item_id, guest_price) values (v_B, 75) on conflict do nothing;
   rep := rep || pg_temp.r('T1 item_prices для A = 200', (select guest_price from item_prices where item_id = v_A) = 200);
   rep := rep || pg_temp.r('T1 item_prices для B = 75', (select guest_price from item_prices where item_id = v_B) = 75);
+  rep := rep || pg_temp.r('T1 расходник C на складе компании', _bal(l_wh, v_C) = 5);
 
   -- T2 transfer to_owner
   v_doc := transfer_company_owner('to_owner', v_O, jsonb_build_array(
@@ -62,6 +67,24 @@ begin
     (select count(*) > 0 from warehouse_valuation where scope = 'company' and on_hand > 0));
   rep := rep || pg_temp.r('T8 view owner scope',
     (select count(*) > 0 from warehouse_valuation where scope = 'owner' and on_hand > 0 and owner_apartment_id = v_O));
+  -- T8a расходник с остатком попадает в scope company (все категории)
+  rep := rep || pg_temp.r('T8a расходник C в scope company',
+    (select count(*) > 0 from warehouse_valuation where scope = 'company' and item_id = v_C and on_hand > 0));
+  -- T8b owner-ветка не содержит строк с нулевым остатком
+  rep := rep || pg_temp.r('T8b owner scope без нулевых остатков',
+    (select count(*) = 0 from warehouse_valuation where scope = 'owner' and on_hand <= 0));
+  -- T8c markup_pct = 100 и margin_pct = 50 для guest_price=200, avg_cost=100
+  rep := rep || pg_temp.r('T8c company markup_pct = 100 для A',
+    (select markup_pct from warehouse_valuation where scope = 'company' and item_id = v_A) = 100);
+  rep := rep || pg_temp.r('T8c company margin_pct = 50 для A',
+    (select margin_pct from warehouse_valuation where scope = 'company' and item_id = v_A) = 50);
+  rep := rep || pg_temp.r('T8c owner markup_pct = 100 для A',
+    (select markup_pct from warehouse_valuation where scope = 'owner' and item_id = v_A and owner_apartment_id = v_O) = 100);
+  rep := rep || pg_temp.r('T8c owner margin_pct = 50 для A',
+    (select margin_pct from warehouse_valuation where scope = 'owner' and item_id = v_A and owner_apartment_id = v_O) = 50);
+  -- T8d старая колонка margin удалена
+  rep := rep || pg_temp.r('T8d колонка margin удалена',
+    not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'warehouse_valuation' and column_name = 'margin'));
 
   -- T3 transfer to_company
   v_doc2 := transfer_company_owner('to_company', v_O, jsonb_build_array(
@@ -115,6 +138,14 @@ begin
     ));
   exception when others then t := sqlerrm; end;
   rep := rep || pg_temp.r('T6 не-админ отклонён', t is not null and t like '%Только администратор%');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+
+  -- T6b не-админ не видит строк warehouse_valuation
+  perform set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-000000000000', 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000000', true);
+  rep := rep || pg_temp.r('T6b не-админ не видит warehouse_valuation',
+    (select count(*) = 0 from warehouse_valuation));
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', v_admin::text, true);
 
